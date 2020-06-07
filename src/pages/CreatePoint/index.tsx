@@ -1,5 +1,5 @@
-import React, { useEffect, useState, ChangeEvent } from 'react';
-import { Link } from 'react-router-dom';
+import React, { useEffect, useState, ChangeEvent, FormEvent } from 'react';
+import { Link, useHistory} from 'react-router-dom';
 import './styles.css';
 import logo from '../../assets/logo.svg';
 import { FiArrowLeft } from 'react-icons/fi';
@@ -32,14 +32,22 @@ const CreatePoint = () => {
 
     const [selectedUf, setSelectedUf] = useState('0');
     const [selectedCity, setSelectedCity] = useState('0');
-
+    const [selectedItems, setselectedItems] = useState<number[]>([]);
     const [selectedPosition, setSelectedPosition] = useState<[number, number]>([0, 0]);
     const [initialPosition, setInitialPosition] = useState<[number, number]>([0, 0]);
 
+    const [formData, setFormData] = useState({
+        name: '',
+        email: '',
+        whatsapp: ''
+    });
+
+    const history = useHistory();
+
     useEffect(() => {
         navigator.geolocation.getCurrentPosition(position => {
-            const { latitude, longitude} = position.coords;
-            setInitialPosition([latitude,longitude]);
+            const { latitude, longitude } = position.coords;
+            setInitialPosition([latitude, longitude]);
         })
     })
 
@@ -79,11 +87,60 @@ const CreatePoint = () => {
         setSelectedCity(city);
     }
 
-    function handleMapClick(event: LeafletMouseEvent){
+    function handleMapClick(event: LeafletMouseEvent) {
         setSelectedPosition([
             event.latlng.lat,
             event.latlng.lng,
         ])
+    }
+
+    function handleSelectItem(id: number) {
+        const alreadySelected = selectedItems.findIndex(item => item === id);
+
+        if (alreadySelected >= 0) {
+            // valida o item que ja foi clicado e adiciona ao estado todos os itens selecionado menos o que ele clicou novamente,
+            // sendo assim desmarca o item que foi clicado novamente
+            const filteredItems = selectedItems.filter(item => item !== id);
+
+            setselectedItems(filteredItems);
+        } else {
+            // Adiciona ao estado o item clicado
+            setselectedItems([...selectedItems, id]);
+        }
+    }
+
+    function handleInputChange(event: ChangeEvent<HTMLInputElement>) {
+        const { name, value } = event.target;
+
+        //copiar tudo que ja tem dentro do objeto formData para que não seja substituído todos os valores do formulário, somente o input específico.
+        setFormData({ ...formData, [name]: value });
+    }
+
+    async function handleSubmit(event: FormEvent) {
+        event.preventDefault();
+
+        const {name, email, whatsapp} = formData;
+        const uf = selectedUf;
+        const city = selectedCity;
+        const [latitude, longitude] = selectedPosition;
+        const items = selectedItems;
+
+        const data = {
+            name,
+            email,
+            whatsapp,
+            uf,
+            city,
+            latitude,
+            longitude,
+            items
+        };
+
+        await api.post('points', data);
+
+        alert('Ponto de coleta criado!');
+
+        history.push('/');
     }
 
     return (
@@ -97,7 +154,7 @@ const CreatePoint = () => {
                 </Link>
             </header>
 
-            <form>
+            <form onSubmit={handleSubmit}>
 
                 <h1>Cadastro de <br /> ponto de coleta</h1>
 
@@ -112,6 +169,7 @@ const CreatePoint = () => {
                             type="text"
                             name="name"
                             id="name"
+                            onChange={handleInputChange}
                         />
                     </div>
 
@@ -122,6 +180,7 @@ const CreatePoint = () => {
                                 type="email"
                                 name="email"
                                 id="email"
+                                onChange={handleInputChange}
                             />
                         </div>
 
@@ -131,6 +190,7 @@ const CreatePoint = () => {
                                 type="text"
                                 name="whatsapp"
                                 id="whatsapp"
+                                onChange={handleInputChange}
                             />
                         </div>
 
@@ -190,7 +250,11 @@ const CreatePoint = () => {
 
                     <ul className="items-grid">
                         {items.map(item => (
-                            <li key={item.id}>
+                            <li
+                                key={item.id}
+                                onClick={() => handleSelectItem(item.id)}
+                                className={selectedItems.includes(item.id) ? 'selected' : ''}
+                            >
                                 <img src={item.image_url} alt="Teste" />
                                 <span>{item.title}</span>
                             </li>
